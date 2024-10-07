@@ -14,18 +14,32 @@ const ProductList = () => {
     const fetchProducts = async () => {
       try {
         let query = `${apiUrl}?search=${searchTerm}`;
-        if (filters.length > 0) {
-          query += `&filters=${filters.join(',')}`;
+
+        // Check if low-stock filter is active
+        if (filters.includes('low-Stock')) {
+          const response = await axios.get(`${apiUrl}/low-stock`); // Fetch low-stock products
+          const productsWithDefaults = response.data.map(product => {
+            const imageUrl = product.imageUrl ? `${baseUrl}${product.imageUrl.replace('/uploads/', '')}` : '';
+            console.log(`Constructed image URL for low-stock product ${product._id}: ${imageUrl}`);
+            return {
+              ...product,
+              colors: Array.isArray(product.colors) ? product.colors : [],
+              imageUrl,
+            };
+          });
+          setProducts(productsWithDefaults);
+        } else {
+          const response = await axios.get(query);
+          const productsWithDefaults = response.data.map(product => {
+            const imageUrl = product.imageUrl ? `${baseUrl}${product.imageUrl.replace('/uploads/', '')}` : '';
+            return {
+              ...product,
+              colors: Array.isArray(product.colors) ? product.colors : [],
+              imageUrl,
+            };
+          });
+          setProducts(productsWithDefaults);
         }
-
-        const response = await axios.get(query);
-        const productsWithDefaults = response.data.map(product => ({
-          ...product,
-          colors: Array.isArray(product.colors) ? product.colors : [],
-          imageUrl: product.imageUrl ? `${baseUrl}${product.imageUrl.replace('/uploads/', '')}` : '',
-        }));
-
-        setProducts(productsWithDefaults);
       } catch (error) {
         console.error('Error fetching products:', error);
       }
@@ -79,13 +93,9 @@ const ProductList = () => {
       </div>
 
       <div className="filters-container">
-        <button className={`filter-btn ${filters.includes('Dress') ? 'active' : ''}`} onClick={() => toggleFilter('Dress')}>
-          Dress
+        <button className={`filter-btn ${filters.includes('low-Stock') ? 'active' : ''}`} onClick={() => toggleFilter('low-Stock')}>
+          Low-Stock
         </button>
-        <button className={`filter-btn ${filters.includes('InStock') ? 'active' : ''}`} onClick={() => toggleFilter('InStock')}>
-          In Stock
-        </button>
-        <button className="filter-btn" onClick={() => toggleFilter('')}>+ Add Filter</button>
       </div>
 
       <div className="table-container">
@@ -103,7 +113,7 @@ const ProductList = () => {
                 <th>Price</th>
                 <th>Quantity</th>
                 <th>Edit</th>
-                <th>Delete</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>

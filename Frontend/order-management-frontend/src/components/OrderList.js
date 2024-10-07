@@ -14,26 +14,24 @@ const OrderList = () => {
   const apiUrl = `${process.env.REACT_APP_API_URL}/allorders`;
   const searchUrl = `${process.env.REACT_APP_API_URL}/orders/search`;
 
-  // Using useCallback to memoize fetchOrders
   const fetchOrders = useCallback(async (query = '') => {
     setLoading(true);
     try {
-      const url = query ? `${searchUrl}?query=${query}` : apiUrl; // Updated to use the correct URL
+      const url = query ? `${searchUrl}?query=${query}` : apiUrl;
       const response = await axios.get(url);
       setOrders(response.data);
       await fetchProducts(response.data);
-  } catch (error) {
-      console.error('Error fetching orders:', error); // Log the error for debugging
-      toast.error('Error fetching orders'); // Notify user about the error
-  }
-   finally {
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      toast.error('Error fetching orders');
+    } finally {
       setLoading(false);
     }
-  }, [apiUrl, searchUrl]); // Make sure to include dependencies here
+  }, [apiUrl, searchUrl]);
 
   useEffect(() => {
-    fetchOrders(); // Fetch orders initially
-  }, [fetchOrders]); // Include fetchOrders in dependency array
+    fetchOrders();
+  }, [fetchOrders]);
 
   const fetchProducts = async (orders) => {
     try {
@@ -55,7 +53,7 @@ const OrderList = () => {
   const handleSearchChange = (event) => {
     const query = event.target.value;
     setSearchQuery(query);
-    fetchOrders(query); // Fetch orders based on the current search query
+    fetchOrders(query);
   };
 
   const handleShippingDetailsChange = (orderId, field, value) => {
@@ -71,21 +69,22 @@ const OrderList = () => {
   const handleConfirmShipping = async (orderId) => {
     const orderShippingDetails = shippingDetails[orderId];
 
-    if (!orderShippingDetails || !orderShippingDetails.address || !orderShippingDetails.estimatedDelivery) {
-      alert('Please enter both address and estimated delivery date.');
+    if (!orderShippingDetails || !orderShippingDetails.shippingID || !orderShippingDetails.estimatedDelivery) {
+      alert('Please enter both Shipping ID and Estimated Delivery Date.');
       return;
     }
 
     try {
       await axios.put(`${process.env.REACT_APP_API_URL}/orders/${orderId}/shipping`, {
         shippingStatus: 'Shipped',
-        shippingDetails: {
-          address: orderShippingDetails.address,
-          estimatedDelivery: orderShippingDetails.estimatedDelivery
-        }
+        shippingID: orderShippingDetails.shippingID,
+        estimatedDeliveryDate: orderShippingDetails.estimatedDelivery
       });
       toast.success('Shipping details updated successfully!');
       setShowShippingForm(prevState => ({ ...prevState, [orderId]: false }));
+
+      // Refresh the orders list after confirmation
+      fetchOrders(); // Refresh the order list
     } catch (error) {
       console.error('Error updating shipping details:', error);
       alert('Failed to update shipping details.');
@@ -96,6 +95,35 @@ const OrderList = () => {
     setShowShippingForm(prevState => ({ ...prevState, [orderId]: false }));
   };
 
+  const getButtonStyle = (status) => {
+    switch (status) {
+      case 'Pending':
+        return { backgroundColor: '#4CAF50', color: 'white' }; // Green
+      case 'Shipped':
+        return { backgroundColor: 'orange', color: 'white' }; // Orange
+      case 'Delivered':
+        return { backgroundColor: 'lightgreen', color: 'white' }; // Light Green
+      case 'Issues':
+        return { backgroundColor: 'red', color: 'white' }; // Red
+      default:
+        return {};
+    }
+  };
+
+  const sortedOrders = orders.sort((a, b) => {
+    const statusPriority = {
+      Issues: 1,    // Highest priority
+      Pending: 2,
+      Shipped: 3,
+      Delivered: 4  // Lowest priority
+    };
+  
+    const statusA = a.primaryInfo.shippingStatus;
+    const statusB = b.primaryInfo.shippingStatus;
+  
+    return statusPriority[statusA] - statusPriority[statusB];
+  });
+  
   return (
     <div className="main-content">
       <ToastContainer />
@@ -108,7 +136,7 @@ const OrderList = () => {
               type="text"
               placeholder="Search by Product, Customer Name or Email"
               value={searchQuery}
-              onChange={handleSearchChange} // Updated to call handleSearchChange
+              onChange={handleSearchChange}
             />
             <FaSearch className="search-icon" />
           </div>
@@ -118,10 +146,10 @@ const OrderList = () => {
       <div className="order-list">
         {loading ? (
           <p>Loading orders...</p>
-        ) : orders.length === 0 ? (
+        ) : sortedOrders.length === 0 ? (
           <p>No orders found.</p>
         ) : (
-          orders.map(order => {
+          sortedOrders.map(order => {
             const product = products[order._id];
             const imageUrl = product?.primaryInfo?.imageUrl;
 
@@ -169,32 +197,34 @@ const OrderList = () => {
                     <div className="shipping-form">
                       <input
                         type="text"
-                        placeholder="Enter Address"
-                        value={shippingDetails[order._id]?.address || ''}
-                        onChange={e => handleShippingDetailsChange(order._id, 'address', e.target.value)}
+                        placeholder="Enter Shipping ID"
+                        value={shippingDetails[order._id]?.shippingID || ''}
+                        onChange={e => handleShippingDetailsChange(order._id, 'shippingID', e.target.value)}
                       />
+                      {/* Calendar input for estimated delivery date */}
                       <input
-                        type="text"
+                        type="date"
                         placeholder="Estimated Delivery Date"
                         value={shippingDetails[order._id]?.estimatedDelivery || ''}
                         onChange={e => handleShippingDetailsChange(order._id, 'estimatedDelivery', e.target.value)}
                       />
-                      <button onClick={() => handleConfirmShipping(order._id)}>Confirm</button>
-                      <button onClick={() => handleCancelShipping(order._id)}>Cancel</button>
+                      <button
+                        className="button confirm-button"
+                        onClick={() => handleConfirmShipping(order._id)}>Confirm</button>
+                      <button
+                        className="button cancel-button"
+                        onClick={() => handleCancelShipping(order._id)}>Cancel</button>
                     </div>
                   ) : (
                     <button
-                      style={{
-                        backgroundColor: order.primaryInfo.shippingStatus === 'Shipped' ? '#d2b48c' : '#4CAF50',
-                        color: 'white'
-                      }}
+                      style={getButtonStyle(order.primaryInfo.shippingStatus)}
                       onClick={() => {
-                        if (order.primaryInfo.shippingStatus !== 'Shipped') {
+                        if (order.primaryInfo.shippingStatus === 'Pending') {
                           setShowShippingForm(prevState => ({ ...prevState, [order._id]: true }));
                         }
                       }}
                     >
-                      {order.primaryInfo.shippingStatus === 'Shipped' ? 'Shipped' : 'Proceed'}
+                      {order.primaryInfo.shippingStatus}
                     </button>
                   )}
                 </div>

@@ -150,7 +150,7 @@ const CreateProduct = () => {
 
             <div className="form-section small-input">
               <label>Discount Type</label>
-              <input type="text" name="discountType" value={product.discountType} onChange={handleInputChange} placeholder="Enter discount type" />
+              <input type="text" name="discountType" value={product.discountType} onChange={handleInputChange} placeholder="Type fixed / percentage" />
             </div>
 
             <div className="form-section">
@@ -192,7 +192,7 @@ const CreateProduct = () => {
                 name="colors"
                 value={product.colors.join(', ')}
                 onChange={handleInputChange}
-                placeholder="Enter colors separated by commas"
+                placeholder="Enter colors separated by commas (red,green,yellow)"
               />
             </div>
 

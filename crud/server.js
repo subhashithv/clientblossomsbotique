@@ -2,6 +2,9 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
 const cors = require('cors');
+const cron = require('node-cron');
+const Order = require('./models/orderModel'); // Adjust the path as necessary
+
 const productRoutes = require('./routes/productRoutes');
 const connectDB = require('./config/db'); // If db.js is inside config folder
 const multer = require('multer'); // Import multer
@@ -40,4 +43,22 @@ app.use('/api', orderRoutes);
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+});
+cron.schedule('0 0 * * *', async () => { // Run at midnight every day
+  try {
+      const now = new Date();
+
+      // Find all orders that have not been delivered and whose estimated delivery date has passed
+      const orders = await Order.updateMany(
+          {
+              "primaryInfo.shippingStatus": { $ne: 'Delivered' },
+              "primaryInfo.estimatedDeliveryDate": { $lt: now }
+          },
+          { $set: { "primaryInfo.shippingStatus": 'Delivered' } }
+      );
+
+      console.log(`Updated ${orders.nModified} orders to 'Delivered'`);
+  } catch (error) {
+      console.error('Error updating order statuses:', error);
+  }
 });
